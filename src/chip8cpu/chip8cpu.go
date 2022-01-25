@@ -233,6 +233,7 @@ func (c *CHIP8) Initialize() {
 	for i := 0; i < 80; i++ {
 		c.memory[i] = chip8_fontset[i]
 	}
+	c.drawFlag = false
 }
 
 func (c *CHIP8) RunCycle() {
@@ -244,4 +245,12 @@ func (c *CHIP8) RunCycle() {
 
 func (c CHIP8) GetCanvas() [64 * 32]byte {
 	return c.graphics
+}
+
+func (c *CHIP8) DrawFlag() bool {
+	return c.drawFlag
+}
+
+func (c *CHIP8) ResetDrawFlag() {
+	c.drawFlag = false
 }
