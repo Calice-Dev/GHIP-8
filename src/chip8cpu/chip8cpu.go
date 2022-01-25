@@ -41,15 +41,15 @@ var chip8_fontset = [80]byte{
 
 var opcodeMap = map[uint16]opcodeFunc{
 	0x0000: func(c *CHIP8) {
-		switch c.opcode & 0x000F {
+		switch c.opcode & 0x00FF {
 		//00E0: Clears the screen.
-		case 0x0000:
+		case 0x00E0:
 			for i := 0; i < 64*32; i++ {
 				c.graphics[i] = 0x0
 			}
 			c.drawFlag = true
 		//00EE: Returns from a subroutine.
-		case 0x000E:
+		case 0x00EE:
 			c.pc = c.stack[c.sp]
 			c.sp--
 		}
