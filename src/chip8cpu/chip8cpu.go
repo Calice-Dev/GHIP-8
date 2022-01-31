@@ -219,7 +219,6 @@ var opcodeMap = map[uint16]opcodeFunc{
 		case 0x0007:
 			c.v[x] = c.delayTimer
 		case 0x000A:
-			fmt.Println(c.GamePad)
 			keyPressed := false
 			for i := 0; i < 16; i++ {
 				if c.GamePad[i] != 0 {
