@@ -298,7 +298,7 @@ func (c *CHIP8) RunCycle(printOC bool) {
 	// Loads the current instruction into opcode
 	c.opcode = uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
 	if printOC {
-		fmt.Println(c.opcode)
+		fmt.Printf("%x\n", c.opcode)
 	}
 	opcodeMap[c.opcode&0xF000](c)
 	c.pc += 2
