@@ -57,7 +57,7 @@ func main() {
 	chip8.Initialize(romName)
 	var paletteIndex int
 	frequency := 1.0 / 60.0
-	cyclesPerFrame := 30
+	cyclesPerFrame := 20
 	rand.Seed(time.Now().UnixNano())
 	paletteIndex = rand.Int() % len(colorPalettes)
 	pOpcode := false
