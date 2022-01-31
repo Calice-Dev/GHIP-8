@@ -189,7 +189,7 @@ var opcodeMap = map[uint16]opcodeFunc{
 					if c.FrameBuffer[p] == 1 {
 						c.v[0xF] = 1
 					}
-					c.FrameBuffer[p] ^= 1
+					c.FrameBuffer[p] = c.FrameBuffer[p] ^ 1
 				}
 			}
 		}
@@ -217,6 +217,7 @@ var opcodeMap = map[uint16]opcodeFunc{
 		case 0x0007:
 			c.v[x] = c.delayTimer
 		case 0x000A:
+			fmt.Println(c.GamePad)
 			keyPressed := false
 			for i := 0; i < 16; i++ {
 				if c.GamePad[i] != 0 {
@@ -250,12 +251,12 @@ var opcodeMap = map[uint16]opcodeFunc{
 			for i := 0; uint16(i) <= (x); i++ {
 				c.memory[c.i+uint16(i)] = c.v[i]
 			}
-			//c.i += x + 1
+			c.i += x + 1
 		case 0x0065:
 			for i := 0; uint16(i) <= x; i++ {
 				c.v[i] = c.memory[c.i+uint16(i)]
 			}
-			//c.i += x + 1
+			c.i += x + 1
 		}
 	},
 }
@@ -292,17 +293,14 @@ func (c *CHIP8) Initialize(rom string) {
 	c.readRom(rom)
 }
 
-func (c *CHIP8) RunCycle() {
+func (c *CHIP8) RunCycle(printOC bool) {
 	// Loads the current instruction into opcode
 	c.opcode = uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
+	if printOC {
+		fmt.Println(c.opcode)
+	}
 	opcodeMap[c.opcode&0xF000](c)
 	c.pc += 2
-	if c.delayTimer > 0 {
-		c.delayTimer--
-	}
-	if c.soundTimer > 0 {
-		c.soundTimer--
-	}
 }
 
 func (c CHIP8) GetCanvas() [64 * 32]byte {
@@ -342,4 +340,17 @@ func (c *CHIP8) readRom(romName string) {
 
 func (c *CHIP8) MemoryHexDump(start int) {
 	fmt.Println(hex.Dump(c.memory[start:]))
+}
+
+func (c *CHIP8) ReduceTimers() {
+	if c.delayTimer > 0 {
+		c.delayTimer--
+	}
+	if c.soundTimer > 0 {
+		c.soundTimer--
+	}
+}
+
+func (c *CHIP8) GetOpcode() uint16 {
+	return c.opcode
 }

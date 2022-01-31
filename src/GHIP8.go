@@ -57,9 +57,10 @@ func main() {
 	chip8.Initialize(romName)
 	var paletteIndex int
 	frequency := 1.0 / 60.0
+	cyclesPerFrame := 30
 	rand.Seed(time.Now().UnixNano())
 	paletteIndex = rand.Int() % len(colorPalettes)
-
+	pOpcode := false
 	for i, v := range args {
 		if v == "-h" {
 			chip8.MemoryHexDump(512)
@@ -81,6 +82,16 @@ func main() {
 				panic(err)
 			}
 		}
+		if v == "-d" {
+			pOpcode = true
+		}
+		if v == "-c" {
+			var err error
+			cyclesPerFrame, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 	window, renderer, err := sdl.CreateWindowAndRenderer(640, 320, sdl.WINDOW_BORDERLESS|sdl.WINDOW_RESIZABLE)
 	renderer.SetLogicalSize(64, 32)
@@ -88,43 +99,59 @@ func main() {
 		panic(err)
 	}
 
-	mainLoop(&chip8, window, renderer, keyMap, &paletteIndex, frequency)
+	mainLoop(&chip8, window, renderer, keyMap, &paletteIndex, frequency, pOpcode, cyclesPerFrame)
 }
 
-func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyMap map[sdl.Scancode]byte, paletteIndex *int, frequency float64) {
+func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyMap map[sdl.Scancode]byte, paletteIndex *int, frequency float64, p bool, c int) {
 	for {
 		frameStartTime := time.Now()
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch eventType := event.(type) {
-			case *sdl.QuitEvent:
-				return
-			case *sdl.KeyboardEvent:
-				scanCode := eventType.Keysym.Scancode
-				if scanCode == sdl.SCANCODE_P && eventType.State == sdl.PRESSED {
-					*paletteIndex = (*paletteIndex + 1) % len(colorPalettes)
-				}
-				if eventType.State == sdl.PRESSED {
-					chip8.GamePad[keyMap[scanCode]] = 1
-				}
-				if eventType.State == sdl.RELEASED {
-					chip8.GamePad[keyMap[scanCode]] = 0
+		for j := 0; j < c; j++ {
+			for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+				switch eventType := event.(type) {
+				case *sdl.QuitEvent:
+					return
+				case *sdl.KeyboardEvent:
+					scanCode := eventType.Keysym.Scancode
+					if scanCode == sdl.SCANCODE_P && eventType.State == sdl.PRESSED {
+						*paletteIndex = (*paletteIndex + 1) % len(colorPalettes)
+					}
+					if eventType.State == sdl.PRESSED {
+						_, ok := keyMap[scanCode]
+						if ok {
+							chip8.GamePad[keyMap[scanCode]] = 1
+						}
+					}
+					if eventType.State == sdl.RELEASED {
+						_, ok := keyMap[scanCode]
+						if ok {
+							chip8.GamePad[keyMap[scanCode]] = 0
+						}
+					}
 				}
 			}
+			cycle(chip8, renderer, *paletteIndex, p)
 		}
-		cycle(chip8, renderer, *paletteIndex)
+		chip8.ReduceTimers()
 		frameEndTime := time.Now()
 		elapsed := frameEndTime.Sub(frameStartTime)
-		s := fmt.Sprintf("%fms", frequency)
-		sleepTime, _ := time.ParseDuration(s)
-		sleepTime -= elapsed
+		s := fmt.Sprintf("%fs", frequency)
+		//fmt.Println(s)
+		//frameTime := time.Duration(elapsed.Milliseconds())
+		desiredFrameTime, err := time.ParseDuration(s)
+		//fmt.Println(desiredFrameTime)
+		if err != nil {
+			panic(err)
+		}
+		sleepTime := (desiredFrameTime - elapsed)
+		//fmt.Println(sleepTime)
 		if sleepTime > 0 {
-			time.Sleep(sleepTime - elapsed)
+			time.Sleep(sleepTime)
 		}
 	}
 }
 
-func cycle(chip8 *cpu.CHIP8, renderer *sdl.Renderer, paletteIndex int) {
-	chip8.RunCycle()
+func cycle(chip8 *cpu.CHIP8, renderer *sdl.Renderer, paletteIndex int, p bool) {
+	chip8.RunCycle(p)
 	if chip8.DrawFlag() {
 		UpdateGraphics(renderer, chip8.FrameBuffer, paletteIndex)
 		chip8.ResetDrawFlag()
