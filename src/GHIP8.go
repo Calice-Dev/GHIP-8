@@ -2,6 +2,7 @@ package main
 
 import (
 	cpu "chip8cpu"
+	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
@@ -54,29 +55,45 @@ func main() {
 	romName := args[0]
 	var chip8 cpu.CHIP8
 	chip8.Initialize(romName)
+	var paletteIndex int
+	frequency := 1.0 / 60.0
+	rand.Seed(time.Now().UnixNano())
+	paletteIndex = rand.Int() % len(colorPalettes)
+
+	for i, v := range args {
+		if v == "-h" {
+			chip8.MemoryHexDump(512)
+		}
+		if v == "-hC" {
+			chip8.MemoryHexDump(0)
+		}
+		if v == "-p" {
+			var err error
+			paletteIndex, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				panic(err)
+			}
+		}
+		if v == "-f" {
+			framerate, err := strconv.Atoi(args[i+1])
+			frequency = 1.0 / float64(framerate)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
 	window, renderer, err := sdl.CreateWindowAndRenderer(640, 320, sdl.WINDOW_BORDERLESS|sdl.WINDOW_RESIZABLE)
 	renderer.SetLogicalSize(64, 32)
 	if err != nil {
 		panic(err)
 	}
 
-	var paletteIndex int
-	if len(args) == 2 {
-		index, err := strconv.Atoi(args[1])
-		if err != nil {
-			panic(err)
-		}
-		index = index % len(colorPalettes)
-		paletteIndex = index
-	} else {
-		rand.Seed(time.Now().UnixNano())
-		paletteIndex = rand.Int() % len(colorPalettes)
-	}
-	mainLoop(&chip8, window, renderer, keyMap, &paletteIndex)
+	mainLoop(&chip8, window, renderer, keyMap, &paletteIndex, frequency)
 }
 
-func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyMap map[sdl.Scancode]byte, paletteIndex *int) {
+func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyMap map[sdl.Scancode]byte, paletteIndex *int, frequency float64) {
 	for {
+		frameStartTime := time.Now()
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch eventType := event.(type) {
 			case *sdl.QuitEvent:
@@ -95,23 +112,24 @@ func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyM
 			}
 		}
 		cycle(chip8, renderer, *paletteIndex)
+		frameEndTime := time.Now()
+		elapsed := frameEndTime.Sub(frameStartTime)
+		s := fmt.Sprintf("%fms", frequency)
+		sleepTime, _ := time.ParseDuration(s)
+		sleepTime -= elapsed
+		if sleepTime > 0 {
+			time.Sleep(sleepTime - elapsed)
+		}
 	}
 }
 
 func cycle(chip8 *cpu.CHIP8, renderer *sdl.Renderer, paletteIndex int) {
-	frameStartTime := time.Now()
 	chip8.RunCycle()
 	if chip8.DrawFlag() {
 		UpdateGraphics(renderer, chip8.FrameBuffer, paletteIndex)
 		chip8.ResetDrawFlag()
 	}
-	frameEndTime := time.Now()
-	elapsed := frameEndTime.Sub(frameStartTime)
-	sleepTime, _ := time.ParseDuration("1.66666ms")
-	sleepTime -= elapsed
-	if sleepTime > 0 {
-		time.Sleep(sleepTime - elapsed)
-	}
+
 }
 
 func UpdateGraphics(renderer *sdl.Renderer, graphics [64 * 32]byte, paletteIndex int) {
