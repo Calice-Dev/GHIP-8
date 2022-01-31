@@ -188,8 +188,6 @@ var opcodeMap = map[uint16]opcodeFunc{
 					xp := (x + xline) % 64
 					yp := (y + yline) % 32
 					p := xp + (yp * 64)
-					//p := clamp((xp + (yp * 64)), 0, (64*32)-1)
-					fmt.Println(p)
 					if c.FrameBuffer[p] == 1 {
 						c.v[0xF] = 1
 					}
