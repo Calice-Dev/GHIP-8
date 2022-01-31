@@ -2,7 +2,9 @@ package chip8cpu
 
 import (
 	"bufio"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"os"
@@ -248,12 +250,12 @@ var opcodeMap = map[uint16]opcodeFunc{
 			for i := 0; uint16(i) <= (x); i++ {
 				c.memory[c.i+uint16(i)] = c.v[i]
 			}
-			c.i += x + 1
+			//c.i += x + 1
 		case 0x0065:
 			for i := 0; uint16(i) <= x; i++ {
 				c.v[i] = c.memory[c.i+uint16(i)]
 			}
-			c.i += x + 1
+			//c.i += x + 1
 		}
 	},
 }
@@ -336,4 +338,8 @@ func (c *CHIP8) readRom(romName string) {
 			break
 		}
 	}
+}
+
+func (c *CHIP8) MemoryHexDump(start int) {
+	fmt.Println(hex.Dump(c.memory[start:]))
 }
