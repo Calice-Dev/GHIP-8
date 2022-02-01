@@ -20,7 +20,7 @@ type colorPalette struct {
 	lightB byte
 }
 
-var colorPalettes [8]colorPalette = [...]colorPalette{
+var colorPalettes = [...]colorPalette{
 	colorPalette{0x22, 0x23, 0x23, 0xf0, 0xf6, 0xf0}, // https://lospec.com/palette-list/1bit-monitor-glow
 	colorPalette{0x38, 0x2b, 0x26, 0xb8, 0xc2, 0xb9}, // https://lospec.com/palette-list/paperback-2
 	colorPalette{0x1e, 0x1c, 0x32, 0xc6, 0xba, 0xac}, // https://lospec.com/palette-list/noire-truth
@@ -29,7 +29,7 @@ var colorPalettes [8]colorPalette = [...]colorPalette{
 	colorPalette{0x21, 0x2c, 0x28, 0x72, 0xa4, 0x88}, // https://lospec.com/palette-list/knockia3310
 	colorPalette{0x22, 0x2a, 0x3d, 0xed, 0xf2, 0xe2}, // https://lospec.com/palette-list/note-2c
 	colorPalette{0x0a, 0x2e, 0x44, 0xfc, 0xff, 0xcc}, // https://lospec.com/palette-list/gato-roboto-starboard
-
+	colorPalette{0x00, 0x66, 0x00, 0x00, 0x00, 0x99}, // painlette
 }
 
 func main() {
@@ -51,10 +51,17 @@ func main() {
 		sdl.SCANCODE_C: 0xB,
 		sdl.SCANCODE_V: 0xF,
 	}
+	fmt.Println("Initializing GHIP-8: CHIP-8 Emulator")
+	fmt.Println("...")
+	var chip8 cpu.CHIP8
+	chip8.Initialize()
+	fmt.Println("Initialization succesful")
 	args := os.Args[1:]
 	romName := args[0]
-	var chip8 cpu.CHIP8
-	chip8.Initialize(romName)
+	fmt.Println("Loading ROM: ", romName)
+	fmt.Println("...")
+	chip8.ReadRom(romName)
+	fmt.Println("Loading succesful")
 	var paletteIndex int
 	frequency := 1.0 / 60.0
 	cyclesPerFrame := 20
@@ -63,9 +70,11 @@ func main() {
 	pOpcode := false
 	for i, v := range args {
 		if v == "-h" {
+			fmt.Println("Debug: Dumping memory: ")
 			chip8.MemoryHexDump(512)
 		}
 		if v == "-hC" {
+			fmt.Println("Debug: Dumping memory: ")
 			chip8.MemoryHexDump(0)
 		}
 		if v == "-p" {
@@ -83,6 +92,7 @@ func main() {
 			}
 		}
 		if v == "-d" {
+			fmt.Println("Debug: Printing executed opcodes")
 			pOpcode = true
 		}
 		if v == "-c" {
@@ -93,27 +103,38 @@ func main() {
 			}
 		}
 	}
+	fmt.Println("Framerate: ", int(1/frequency), "FPS")
+	fmt.Println("Speed: ", cyclesPerFrame, " Cycles per Frame")
+	fmt.Println("Palette: ", paletteIndex)
 	window, renderer, err := sdl.CreateWindowAndRenderer(640, 320, sdl.WINDOW_BORDERLESS|sdl.WINDOW_RESIZABLE)
 	renderer.SetLogicalSize(64, 32)
 	if err != nil {
 		panic(err)
 	}
-
 	mainLoop(&chip8, window, renderer, keyMap, &paletteIndex, frequency, pOpcode, cyclesPerFrame)
 }
 
 func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyMap map[sdl.Scancode]byte, paletteIndex *int, frequency float64, p bool, c int) {
+	paused := false
+	runOneStep := false
 	for {
 		frameStartTime := time.Now()
 		for j := 0; j < c; j++ {
 			for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 				switch eventType := event.(type) {
 				case *sdl.QuitEvent:
+					fmt.Println("Closing Emulator")
 					return
 				case *sdl.KeyboardEvent:
 					scanCode := eventType.Keysym.Scancode
 					if scanCode == sdl.SCANCODE_P && eventType.State == sdl.PRESSED {
 						*paletteIndex = (*paletteIndex + 1) % len(colorPalettes)
+					}
+					if scanCode == sdl.SCANCODE_ESCAPE && eventType.State == sdl.PRESSED {
+						paused = !paused
+					}
+					if scanCode == sdl.SCANCODE_N && eventType.State == sdl.PRESSED {
+						runOneStep = true
 					}
 					if eventType.State == sdl.PRESSED {
 						_, ok := keyMap[scanCode]
@@ -129,24 +150,32 @@ func mainLoop(chip8 *cpu.CHIP8, window *sdl.Window, renderer *sdl.Renderer, keyM
 					}
 				}
 			}
-			cycle(chip8, renderer, *paletteIndex, p)
+			if !paused || runOneStep {
+				cycle(chip8, renderer, *paletteIndex, p)
+			}
 		}
-		chip8.ReduceTimers()
-		frameEndTime := time.Now()
-		elapsed := frameEndTime.Sub(frameStartTime)
-		s := fmt.Sprintf("%fs", frequency)
-		//fmt.Println(s)
-		//frameTime := time.Duration(elapsed.Milliseconds())
-		desiredFrameTime, err := time.ParseDuration(s)
-		//fmt.Println(desiredFrameTime)
-		if err != nil {
-			panic(err)
+		if !paused || runOneStep {
+			chip8.ReduceTimers()
+			frameEndTime := time.Now()
+			elapsed := frameEndTime.Sub(frameStartTime)
+			s := fmt.Sprintf("%fs", frequency)
+			//fmt.Println(s)
+			//frameTime := time.Duration(elapsed.Milliseconds())
+			desiredFrameTime, err := time.ParseDuration(s)
+			//fmt.Println(desiredFrameTime)
+			if err != nil {
+				panic(err)
+			}
+			sleepTime := (desiredFrameTime - elapsed)
+			//fmt.Println(sleepTime)
+			if sleepTime > 0 {
+				time.Sleep(sleepTime)
+			}
+			if p {
+				fmt.Println()
+			}
 		}
-		sleepTime := (desiredFrameTime - elapsed)
-		//fmt.Println(sleepTime)
-		if sleepTime > 0 {
-			time.Sleep(sleepTime)
-		}
+		runOneStep = false
 	}
 }
 
