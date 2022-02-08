@@ -109,6 +109,12 @@ func main() {
 				panic(err)
 			}
 		}
+		if v == "-sX" || v == "-shiftX" {
+			chip8.ShiftY = false
+		}
+		if v == "-sY" || v == "-shiftY" {
+			chip8.ShiftY = true
+		}
 	}
 	fmt.Println("Framerate: ", int(1/frequency), "FPS")
 	fmt.Println("Speed: ", cyclesPerFrame, " Cycles per Frame")
