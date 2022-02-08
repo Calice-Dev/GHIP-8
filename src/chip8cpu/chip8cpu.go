@@ -24,6 +24,7 @@ type CHIP8 struct {
 	FrameBuffer [64 * 32]byte
 	GamePad     [16]byte
 	drawFlag    bool
+	ShiftY      bool
 }
 
 type opcodeFunc func(c *CHIP8)
@@ -134,8 +135,14 @@ var opcodeMap = map[uint16]opcodeFunc{
 			c.v[x] -= c.v[y]
 		//6: Stores the least significant bit of VX in VF and then shifts VX to the right by 1
 		case 0x0006:
-			c.v[0xF] = c.v[y] & 0x1
-			c.v[x] = c.v[y] >> 1
+			n := byte(0)
+			if c.ShiftY {
+				n = c.v[y]
+			} else {
+				n = c.v[x]
+			}
+			c.v[0xF] = n & 0x1
+			c.v[x] = n >> 1
 		//7: Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there is not.
 		case 0x0007:
 			if c.v[x] > (c.v[y]) {
@@ -146,8 +153,14 @@ var opcodeMap = map[uint16]opcodeFunc{
 			c.v[x] = c.v[y] - c.v[x]
 		//E: Stores the most significant bit of VX in VF and then shifts VX to the left by 1
 		case 0x000E:
-			c.v[0xF] = c.v[y] >> 7
-			c.v[x] = c.v[y] << 1
+			n := byte(0)
+			if c.ShiftY {
+				n = c.v[y]
+			} else {
+				n = c.v[x]
+			}
+			c.v[0xF] = (n >> 7) & 0x1
+			c.v[x] = n << 1
 		}
 	},
 	//9XY0: Skips the next instruction if VX does not equal VY. (Usually the next instruction is a jump to skip a code block);
