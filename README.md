@@ -21,3 +21,5 @@ Optional arguments:
 - -h : prints the console's memory at startup, starting from address 0x200
 - -hC : prints the console's memory at startup, starting from address 0x0
 - -d : prints the current opcode every cycle
+- -sX/-shiftX : bit shifting instructions will directly shift the value in VX
+- -sy/-shiftY : bit shifting instructions will shift the value of VY and then store it in VX
