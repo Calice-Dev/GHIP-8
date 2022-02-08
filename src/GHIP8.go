@@ -64,11 +64,7 @@ func main() {
 		fmt.Println("A FilePath to a rom is required")
 		return
 	}
-	romName := args[0]
-	fmt.Println("Loading ROM: ", romName)
-	fmt.Println("...")
-	chip8.ReadRom(romName)
-	fmt.Println("Loading succesful")
+	var romName string
 	var paletteIndex int
 	frequency := 1.0 / 60.0
 	cyclesPerFrame := 20
@@ -79,43 +75,42 @@ func main() {
 		if v == "-h" {
 			fmt.Println("Debug: Dumping memory: ")
 			chip8.MemoryHexDump(512)
-		}
-		if v == "-hC" {
+		} else if v == "-hC" {
 			fmt.Println("Debug: Dumping memory: ")
 			chip8.MemoryHexDump(0)
-		}
-		if v == "-p" {
+		} else if v == "-p" {
 			var err error
 			paletteIndex, err = strconv.Atoi(args[i+1])
 			if err != nil {
 				panic(err)
 			}
-		}
-		if v == "-f" {
+		} else if v == "-f" {
 			framerate, err := strconv.Atoi(args[i+1])
 			frequency = 1.0 / float64(framerate)
 			if err != nil {
 				panic(err)
 			}
-		}
-		if v == "-d" {
+		} else if v == "-d" {
 			fmt.Println("Debug: Printing executed opcodes")
 			pOpcode = true
-		}
-		if v == "-c" {
+		} else if v == "-c" {
 			var err error
 			cyclesPerFrame, err = strconv.Atoi(args[i+1])
 			if err != nil {
 				panic(err)
 			}
-		}
-		if v == "-sX" || v == "-shiftX" {
+		} else if v == "-sX" || v == "-shiftX" {
 			chip8.ShiftY = false
-		}
-		if v == "-sY" || v == "-shiftY" {
+		} else if v == "-sY" || v == "-shiftY" {
 			chip8.ShiftY = true
+		} else {
+			romName = v
 		}
 	}
+	fmt.Println("Loading ROM: ", romName)
+	fmt.Println("...")
+	chip8.ReadRom(romName)
+	fmt.Println("Loading succesful")
 	fmt.Println("Framerate: ", int(1/frequency), "FPS")
 	fmt.Println("Speed: ", cyclesPerFrame, " Cycles per Frame")
 	fmt.Println("Palette: ", paletteIndex)
