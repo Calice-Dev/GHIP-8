@@ -60,6 +60,10 @@ func main() {
 	chip8.Initialize()
 	fmt.Println("Initialization succesful")
 	args := os.Args[1:]
+	if len(args) == 0 {
+		fmt.Println("A FilePath to a rom is required")
+		return
+	}
 	romName := args[0]
 	fmt.Println("Loading ROM: ", romName)
 	fmt.Println("...")
