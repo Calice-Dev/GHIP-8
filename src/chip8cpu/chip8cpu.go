@@ -24,6 +24,7 @@ type CHIP8 struct {
 	FrameBuffer [64 * 32]byte
 	GamePad     [16]byte
 	drawFlag    bool
+	beepFlag    bool
 	ShiftY      bool
 }
 
@@ -304,6 +305,9 @@ func (c *CHIP8) Initialize() {
 
 	c.delayTimer = 0
 	c.soundTimer = 0
+
+	c.ShiftY = true
+
 	c.drawFlag = true
 }
 
@@ -324,9 +328,16 @@ func (c CHIP8) GetCanvas() [64 * 32]byte {
 func (c *CHIP8) DrawFlag() bool {
 	return c.drawFlag
 }
+func (c *CHIP8) BeepFlag() bool {
+	return c.beepFlag
+}
 
 func (c *CHIP8) ResetDrawFlag() {
 	c.drawFlag = false
+}
+
+func (c *CHIP8) ResetBeepFlag() {
+	c.beepFlag = false
 }
 
 func (c *CHIP8) ReadRom(romName string) {
@@ -359,6 +370,9 @@ func (c *CHIP8) MemoryHexDump(start int) {
 func (c *CHIP8) ReduceTimers() {
 	if c.delayTimer > 0 {
 		c.delayTimer--
+	}
+	if c.soundTimer == 1 {
+		c.beepFlag = true
 	}
 	if c.soundTimer > 0 {
 		c.soundTimer--
