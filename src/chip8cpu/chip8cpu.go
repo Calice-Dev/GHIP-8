@@ -50,15 +50,15 @@ var chip8_fontset = [80]byte{
 
 var opcodeMap = map[uint16]opcodeFunc{
 	0x0000: func(c *CHIP8) {
-		switch c.opcode & 0x000F {
+		switch c.opcode & 0x00FF {
 		//00EO: Clears the screen.
-		case 0x0000:
+		case 0x00E0:
 			for i := 0; i < 64*32; i++ {
 				c.FrameBuffer[i] = 0x0
 			}
 			c.drawFlag = true
 		//00EE: Returns from a subroutine.
-		case 0x000E:
+		case 0x00EE:
 			c.sp--
 			c.pc = c.stack[c.sp]
 		}
@@ -68,7 +68,7 @@ var opcodeMap = map[uint16]opcodeFunc{
 		c.pc = c.opcode & 0x0FFF
 		c.pc -= 2
 	},
-	//2NNN: Calls subroutine at NNN.
+	//2NNN: Calls subroutine at NNN. 100% Correct
 	0x2000: func(c *CHIP8) {
 		c.stack[c.sp] = c.pc
 		c.sp++
@@ -78,19 +78,19 @@ var opcodeMap = map[uint16]opcodeFunc{
 	//3XNN: Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block);
 	0x3000: func(c *CHIP8) {
 		if c.v[(c.opcode&0x0F00)>>8] == byte(0x00FF&c.opcode) {
-			c.pc += 2
+			c.skip()
 		}
 	},
 	//4XNN: Skips the next instruction if VX does not equal NN. (Usually the next instruction is a jump to skip a code block);
 	0x4000: func(c *CHIP8) {
 		if c.v[c.opcode&0x0F00>>8] != byte(0x00FF&c.opcode) {
-			c.pc += 2
+			c.skip()
 		}
 	},
 	//5XY0: Skips the next instruction if VX equals VY. (Usually the next instruction is a jump to skip a code block);
 	0x5000: func(c *CHIP8) {
 		if c.v[(c.opcode&0x0F00)>>8] == c.v[(c.opcode&0x00F0)>>4] {
-			c.pc += 2
+			c.skip()
 		}
 	},
 	//6XNN: Sets VX to NN.
@@ -101,7 +101,7 @@ var opcodeMap = map[uint16]opcodeFunc{
 	0x7000: func(c *CHIP8) {
 		c.v[(c.opcode&0x0F00)>>8] += byte(c.opcode & 0x00FF)
 	},
-	//8XY_ :
+	//8XY_ : 100% Correct
 	0x8000: func(c *CHIP8) {
 		x := (c.opcode & 0x0F00) >> 8
 		y := (c.opcode & 0x00F0) >> 4
@@ -111,16 +111,20 @@ var opcodeMap = map[uint16]opcodeFunc{
 			c.v[x] = c.v[y]
 		//1: Sets VX to VX or VY. (Bitwise OR operation);
 		case 0x0001:
-			c.v[x] = c.v[x] | c.v[y]
+			c.v[x] |= c.v[y]
+			c.v[0xF] = 0
 		//2: Sets VX to VX and VY. (Bitwise AND operation);
 		case 0x0002:
-			c.v[x] = c.v[x] & c.v[y]
+			c.v[x] &= c.v[y]
+			c.v[0xF] = 0
 		//3: Sets VX to VX xor VY..
 		case 0x0003:
-			c.v[x] = c.v[x] ^ c.v[y]
+			c.v[x] ^= c.v[y]
+			c.v[0xF] = 0
 		//4: Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there is not.
 		case 0x0004:
-			if c.v[y] > (0xFF - c.v[x]) {
+			s := int(c.v[x]) + int(c.v[y])
+			if s > 0xFF {
 				c.v[0xF] = 1
 			} else {
 				c.v[0xF] = 0
@@ -128,46 +132,44 @@ var opcodeMap = map[uint16]opcodeFunc{
 			c.v[x] += c.v[y]
 		//5: VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there is not.
 		case 0x0005:
-			if c.v[y] > (c.v[x]) {
-				c.v[0xF] = 0
-			} else {
+			if c.v[x] >= (c.v[y]) {
 				c.v[0xF] = 1
+			} else {
+				c.v[0xF] = 0
 			}
 			c.v[x] -= c.v[y]
 		//6: Stores the least significant bit of VX in VF and then shifts VX to the right by 1
 		case 0x0006:
-			n := byte(0)
-			if c.ShiftY {
-				n = c.v[y]
-			} else {
+			n := c.v[y]
+			if !c.ShiftY {
 				n = c.v[x]
 			}
-			c.v[0xF] = n & 0x1
-			c.v[x] = n >> 1
+			r := n >> 1
+			c.v[0xF] = n & 0b00000001
+			c.v[x] = r
 		//7: Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there is not.
 		case 0x0007:
-			if c.v[x] > (c.v[y]) {
-				c.v[0xF] = 0
-			} else {
+			if c.v[y] >= (c.v[x]) {
 				c.v[0xF] = 1
+			} else {
+				c.v[0xF] = 0
 			}
 			c.v[x] = c.v[y] - c.v[x]
 		//E: Stores the most significant bit of VX in VF and then shifts VX to the left by 1
 		case 0x000E:
-			n := byte(0)
-			if c.ShiftY {
-				n = c.v[y]
-			} else {
+			n := c.v[y]
+			if !c.ShiftY {
 				n = c.v[x]
 			}
-			c.v[0xF] = (n >> 7) & 0x1
+			f := (n & 0b10000000) >> 7
+			c.v[0xF] = f
 			c.v[x] = n << 1
 		}
 	},
 	//9XY0: Skips the next instruction if VX does not equal VY. (Usually the next instruction is a jump to skip a code block);
 	0x9000: func(c *CHIP8) {
 		if c.v[(c.opcode&0x0F00)>>8] != c.v[(c.opcode&0x00F0)>>4] {
-			c.pc += 2
+			c.skip()
 		}
 	},
 	//ANNN: Sets I to the address NNN.
@@ -176,7 +178,9 @@ var opcodeMap = map[uint16]opcodeFunc{
 	},
 	//BNNN: Jumps to the address NNN plus V0.
 	0xB000: func(c *CHIP8) {
-		c.pc = uint16(c.v[0]) + ((c.opcode) & 0x0FFF)
+		//c.pc = ((c.opcode) & 0x0FFF) + uint16(c.v[0])
+		nnn := c.opcode * 0x0FFF
+		c.pc = (nnn) + uint16(c.v[(nnn>>8)*0xF])
 		c.pc -= 2
 	},
 	//CXNN: Sets VX to the result of a bitwise and operation on a random number (Typically: 0 to 255) and NN.
@@ -215,23 +219,28 @@ var opcodeMap = map[uint16]opcodeFunc{
 	},
 	//EX__:
 	0xE000: func(c *CHIP8) {
+		x := (c.opcode & 0x0F00) >> 8
 		switch c.opcode & 0x00FF {
 		//9E: Skips the next instruction if the key stored in VX is pressed. (Usually the next instruction is a jump to skip a code block);
 		case 0x009E:
-			if c.GamePad[c.v[(c.opcode&0x0F00)>>8]] != 0 {
-				c.pc += 2
+			if c.GamePad[c.v[x]] != 0 {
+				c.skip()
 			}
 		//A1: Skips the next instruction if the key stored in VX is not pressed. (Usually the next instruction is a jump to skip a code block);
 		case 0x00A1:
-			if c.GamePad[c.v[(c.opcode&0x0F00)>>8]] == 0 {
-				c.pc += 2
+			if c.GamePad[c.v[x]] == 0 {
+
+				c.skip()
 			}
 		}
 	},
-	//FX__:
+	//FX__: 100% Correct
 	0xF000: func(c *CHIP8) {
 		x := (c.opcode & 0x0F00) >> 8
 		switch c.opcode & 0x00FF {
+		case 0x0000:
+			c.i = uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
+			c.pc += 2
 		case 0x0007:
 			c.v[x] = c.delayTimer
 		case 0x000A:
@@ -246,34 +255,29 @@ var opcodeMap = map[uint16]opcodeFunc{
 				c.pc -= 2
 				return
 			}
-
 		case 0x0015:
 			c.delayTimer = c.v[x]
 		case 0x0018:
 			c.soundTimer = c.v[x]
 		case 0x001E:
-			if c.i+uint16(c.v[x]) > 0xFFF { // VF is set to 1 when range overflow (I+VX>0xFFF), and 0 when there isn't.
-				c.v[0xF] = 1
-			} else {
-				c.v[0xF] = 0
-			}
-			c.i += uint16(c.v[x])
+			i := c.i + uint16(c.v[x])
+			c.i = i
 		case 0x0029:
-			c.i = uint16(c.v[x] * 0x5)
+			c.i = uint16((c.v[x] & 0xF) * 0x5)
 		case 0x0033:
-			c.memory[c.i] = c.v[x] / 100
+			c.memory[c.i] = (c.v[x] / 100) % 10
 			c.memory[c.i+1] = (c.v[x] / 10) % 10
-			c.memory[c.i+2] = (c.v[x] % 100) % 10
+			c.memory[c.i+2] = (c.v[x]) % 10
 		case 0x0055:
-			for i := 0; uint16(i) <= (x); i++ {
-				c.memory[c.i+uint16(i)] = c.v[i]
+			for z := uint16(0); z <= (x); z++ {
+				c.memory[c.i+z] = c.v[z]
 			}
-			//c.i += x + 1
+			c.i = c.i + x + 1
 		case 0x0065:
-			for i := 0; uint16(i) <= x; i++ {
-				c.v[i] = c.memory[c.i+uint16(i)]
+			for z := uint16(0); z <= (x); z++ {
+				c.v[z] = c.memory[c.i+z]
 			}
-			//c.i += x + 1
+			c.i = c.i + x + 1
 		}
 	},
 }
@@ -290,17 +294,17 @@ func (c *CHIP8) Initialize() {
 	}
 
 	for i := 0; i < 16; i++ {
-		c.v[i] = 0x0
-		c.stack[i] = 0x0
-		c.GamePad[i] = 0x0
+		c.v[i] = 0x0000
+		c.stack[i] = 0x0000
+		c.GamePad[i] = 0x0000
+	}
+
+	for i := 0; i < 4096; i++ {
+		c.memory[i] = 0
 	}
 
 	for i := 0; i < 80; i++ {
 		c.memory[i] = chip8_fontset[i]
-	}
-
-	for i := 80; i < 4096; i++ {
-		c.memory[i] = 0
 	}
 
 	c.delayTimer = 0
@@ -371,14 +375,23 @@ func (c *CHIP8) ReduceTimers() {
 	if c.delayTimer > 0 {
 		c.delayTimer--
 	}
-	if c.soundTimer == 1 {
-		c.beepFlag = true
-	}
 	if c.soundTimer > 0 {
 		c.soundTimer--
+		c.beepFlag = true
+	} else {
+		c.beepFlag = false
 	}
 }
 
 func (c *CHIP8) GetOpcode() uint16 {
 	return c.opcode
+}
+
+func (c *CHIP8) skip() {
+	op := uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
+	if op == 0xF000 {
+		c.pc += 4
+	} else {
+		c.pc += 2
+	}
 }
