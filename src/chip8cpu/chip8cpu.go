@@ -265,17 +265,17 @@ var opcodeMap = map[uint16]opcodeFunc{
 		case 0x0029:
 			c.i = uint16((c.v[x] & 0xF) * 0x5)
 		case 0x0033:
-			c.memory[c.i] = (c.v[x] / 100) % 10
-			c.memory[c.i+1] = (c.v[x] / 10) % 10
+			c.memory[c.i] = (c.v[x] / 100)
+			c.memory[c.i+1] = (c.v[x] % 100) / 10
 			c.memory[c.i+2] = (c.v[x]) % 10
 		case 0x0055:
-			for z := uint16(0); z <= (x); z++ {
-				c.memory[c.i+z] = c.v[z]
+			for z := uint16(1); z <= (x + 1); z++ {
+				c.memory[c.i+z-1] = c.v[z-1]
 			}
 			c.i = c.i + x + 1
 		case 0x0065:
-			for z := uint16(0); z <= (x); z++ {
-				c.v[z] = c.memory[c.i+z]
+			for z := uint16(1); z <= (x + 1); z++ {
+				c.v[z-1] = c.memory[c.i+z-1]
 			}
 			c.i = c.i + x + 1
 		}
